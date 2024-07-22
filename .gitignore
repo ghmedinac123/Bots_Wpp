@@ -1,0 +1,28 @@
+# Node modules
+node_modules/
+
+# Virtual Environment
+venv/
+
+# Log files
+*.log
+
+# Audio files
+*.mp3
+*.ogg
+*.wav
+
+# Video files
+*.mp4
+
+# Temporary files
+tmp/
+*.pickle
+*.log
+
+# Mac OS specific files
+.DS_Store
+
+# Python specific files
+__pycache__/
+*.pyc
