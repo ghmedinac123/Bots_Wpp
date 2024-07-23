@@ -31,3 +31,5 @@ __pycache__/
 bot_sessions/
 bfg-1.13.0.jar
 .env
+bot.qr.png
+bot_sessions/baileys_store.json
