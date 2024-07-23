@@ -86,15 +86,19 @@ const predictCoverageFromCoordinates = async (latitude, longitude) => {
 // Función para consultar el chatbot externo
 const queryExternalChatbot = async (message) => {
     try {
-        const response = await axios.post('http://198.50.181.104:5000/chat', {
-            message: message
+        const response = await axios.post('http://198.50.181.104:6002/chat', {
+            text: message  // Asegúrate de que el nombre del parámetro sea 'text'
         }, {
             headers: {
                 'Content-Type': 'application/json'
             }
         });
         console.log('🤖 Chatbot API conectado correctamente.');
-        return response.data.reply;
+        
+        // Imprimir el mensaje que retorna el chatbot
+        console.log('💬 Respuesta del chatbot:', response.data.text);
+        
+        return response.data.text;  // Asegúrate de que el JSON response key es 'text'
     } catch (error) {
         console.error('❌ Error conectando a la Chatbot API:', error);
         return null;
