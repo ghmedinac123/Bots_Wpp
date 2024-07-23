@@ -2,6 +2,7 @@ const { createBot, createProvider, createFlow,  addKeyword,EVENTS } = require('@
 const MongoAdapter = require('@bot-whatsapp/database/mongo');
 const QRPortalWeb = require('@bot-whatsapp/portal');
 const BaileysProvider = require('@bot-whatsapp/provider/baileys');
+const { downloadMediaMessage } = require('@adiwajshing/baileys');
 const MySQLAdapter = require('@bot-whatsapp/database/mysql');
 const axios = require('axios');
 const path = require("path");
@@ -42,18 +43,15 @@ QRPortalWeb({ name: BOTNAME, port: 3052 })
 /**
  * Declaramos las conexiones de MySQL
  */
-const MYSQL_DB_HOST = 'localhost'
-const MYSQL_DB_USER = 'root'
-const MYSQL_DB_PASSWORD = 'GBBGH4R53A8FGLS'
-const MYSQL_DB_NAME = 'bots'
-const MYSQL_DB_PORT = '3306'
+// const MYSQL_DB_HOST = 'localhost'
+// const MYSQL_DB_USER = 'root'
+// const MYSQL_DB_PASSWORD = 'GBBGH4R53A8FGLS'
+// const MYSQL_DB_NAME = 'bots'
+// const MYSQL_DB_PORT = '3306'
 /**
  * Declaramos las conexiones MONGODB
  */
-const adapterDB = new MongoAdapter({
-    dbUri: 'mongodb://198.50.181.104:27017',
-    dbName: 'db_bot',
- })
+
 
 //Función para predecir cobertura a partir de coordenadas usando tu API
 const predictCoverageFromCoordinates = async (latitude, longitude) => {
@@ -102,22 +100,42 @@ const queryExternalChatbot = async (message) => {
         return null;
     }
 };
-// Función para extraer y limpiar la dirección del mensaje
-function extractAddress(messageText) {
-    const regex = new RegExp(`\\b(${addressKeywords.join('|')})\\b.*`, 'i');
-    const match = messageText.match(regex);
-    return match ? match[0] : null;
-}
 
-async function transcribeAudio(audioPath) {
-    return new Promise((resolve, reject) => {
-        exec(`python /home/FututelBots/newBots2/base-baileys-mysql/transcribe_api_key.py ${audioPath}`, (error, stdout, stderr) => {
+
+
+const flowVoice = addKeyword(EVENTS.VOICE_NOTE).addAnswer("Esta es una nota de voz. Voy a procesarla con IA.", null, async (ctx, ctxFn) => {
+    const audioPath = `${process.cwd()}/tmp/voice-note-${Date.now()}.ogg`;
+    const wavPath = audioPath.replace('.ogg', '.wav');
+    
+    try {
+        console.log("Descargando el archivo de audio desde el mensaje.");
+        const buffer = await downloadMediaMessage(ctx, 'buffer');
+        fs.writeFileSync(audioPath, buffer);
+        console.log('Archivo de audio descargado correctamente.');
+
+        // Verificar el tamaño del archivo
+        const fileSize = fs.statSync(audioPath).size;
+        console.log(`Tamaño del archivo descargado: ${fileSize} bytes`);
+
+        if (fileSize === 0) {
+            throw new Error('El archivo de audio descargado está vacío.');
+        }
+
+        // Asegurarse de que el archivo existe
+        if (!fs.existsSync(audioPath)) {
+            throw new Error(`El archivo ${audioPath} no existe.`);
+        }
+
+        // Ejecutar el script de Python para la conversión y transcripción
+        exec(`python /home/FututelBots/newBots2/base-baileys-mysql/transcribe_api_key.py ${audioPath}`, async (error, stdout, stderr) => {
             if (error) {
-                reject(`Error al ejecutar el script de Python: ${error.message}`);
+                console.error(`Error al ejecutar el script de Python: ${error.message}`);
+                console.error(`stderr: ${stderr}`);
+                console.error(`stdout: ${stdout}`);
                 return;
             }
             if (stderr) {
-                reject(`Error en el script de Python: ${stderr}`);
+                console.error(`Error en el script de Python: ${stderr}`);
                 return;
             }
 
@@ -126,90 +144,45 @@ async function transcribeAudio(audioPath) {
             try {
                 const responseData = JSON.parse(stdout);
                 if (responseData.transcript) {
-                    resolve(responseData.transcript);
+                    // Enviar el texto transcrito al usuario
+                    await ctxFn.flowDynamic([{ body: `Tu nota de voz convertida en texto: ${responseData.transcript}` }]);
+                    
+                    // Consultar el chatbot externo con la transcripción
+                    const chatbotResponse = await queryExternalChatbot(responseData.transcript);
+
+                    if (!chatbotResponse) {
+                        await ctxFn.flowDynamic([{ body: "Lo siento, hubo un error al obtener una respuesta del chatbot." }]);
+                    } else {
+                        await ctxFn.flowDynamic([{ body: chatbotResponse }]);
+                    }
                 } else {
-                    reject(responseData.error || "Error desconocido al procesar la transcripción.");
+                    await ctxFn.flowDynamic([{ body: responseData.error || "Error desconocido al procesar la transcripción." }]);
                 }
             } catch (e) {
-                reject(`Error al parsear la respuesta del script de Python: ${e.message}`);
+                console.error(`Error al parsear la respuesta del script de Python: ${e.message}`);
+                await ctxFn.flowDynamic([{ body: "Lo siento, ocurrió un error inesperado al procesar tu nota de voz." }]);
+            } finally {
+                // Eliminar archivos temporales
+                if (fs.existsSync(audioPath)) {
+                    fs.unlinkSync(audioPath);
+                }
+                if (fs.existsSync(wavPath)) {
+                    fs.unlinkSync(wavPath);
+                }
             }
         });
-    });
-}
 
-const flowVoice = addKeyword(EVENTS.VOICE_NOTE).addAnswer("Esta es una nota de voz Voy a Procesarla con IA", null, async (ctx, ctxFn) => {
-    try {
-        const audioUrl = ctx.message.audioMessage.url;
-        const audioPath = '/home/FututelBots/newBots2/base-baileys-mysql/input.ogg';
-
-        // Descargar el archivo de audio
-        const audioResponse = await axios.get(audioUrl, { responseType: 'arraybuffer' });
-        fs.writeFileSync(audioPath, audioResponse.data);
-
-        const text = await transcribeAudio(audioPath);
-
-        if (!text || text === "ERROR") {
-            console.log("Error en la conversión de voz a texto.");
-            if (typeof ctxFn.flowDynamic === 'function') {
-                await ctxFn.flowDynamic([{ body: "Lo siento, hubo un error al procesar la nota de voz." }]);
-            } else {
-                console.error("ctxFn.flowDynamic no es una función. Métodos disponibles en ctxFn:", Object.keys(ctxFn));
-            }
-        } else {
-            console.log("Texto transcrito:", text);
-
-            // Consultar el chatbot externo con la transcripción
-            const chatbotResponse = await queryExternalChatbot(text);
-
-            if (!chatbotResponse) {
-                if (typeof ctxFn.flowDynamic === 'function') {
-                    await ctxFn.flowDynamic([{ body: "Lo siento, hubo un error al obtener una respuesta del chatbot." }]);
-                } else {
-                    console.error("ctxFn.flowDynamic no es una función. Métodos disponibles en ctxFn:", Object.keys(ctxFn));
-                }
-            } else {
-                if (typeof ctxFn.flowDynamic === 'function') {
-                    await ctxFn.flowDynamic([{ body: chatbotResponse }]);
-                } else {
-                    console.error("ctxFn.flowDynamic no es una función. Métodos disponibles en ctxFn:", Object.keys(ctxFn));
-                }
-            }
-        }
     } catch (error) {
         console.error("Error al procesar la nota de voz:", error);
-        if (typeof ctxFn.flowDynamic === 'function') {
-            await ctxFn.flowDynamic([{ body: "Lo siento, ocurrió un error inesperado al procesar tu nota de voz." }]);
-        } else {
-            console.error("ctxFn.flowDynamic no es una función. Métodos disponibles en ctxFn:", Object.keys(ctxFn));
-        }
+        await ctxFn.flowDynamic([{ body: "Lo siento, ocurrió un error inesperado al procesar tu nota de voz." }]);
     }
 });
 
-// Función para convertir dirección a coordenadas usando la API de Google Maps
-async function convertAddressToCoordinates(address) {
-    const apiKey = 'AIzaSyBRlPWGEbAQ0cZa-myo6PQPpMMWovKBDA4';
-    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${apiKey}`;
 
-    try {
-        const response = await axios.get(url);
-        if (response.data.status === 'OK') {
-            const location = response.data.results[0].geometry.location;
-            console.log(`📍 Dirección: ${address}`);
-            console.log(`📍 Coordenadas obtenidas: Latitud ${location.lat}, Longitud ${location.lng}`);
-            return {
-                latitude: location.lat,
-                longitude: location.lng
-            };
-        } else {
-            throw new Error('No se pudo obtener las coordenadas');
-        }
-    } catch (error) {
-        console.error('Error al convertir la dirección a coordenadas:', error);
-        throw error;
-    }
-}
 
-const humanAgent = '573185386235@s.whatsapp.net';
+
+
+const humanAgent = '5731688833245@s.whatsapp.net';
 
 const sendToHumanAgent = async (provider, message) => {
   
@@ -262,7 +235,7 @@ const flowRecopilarDatos = addKeyword(EVENTS.ACTION)
         await flowDynamic(`Tus datos son:\nNombre: ${myState.name}\nNúmero de cédula: ${myState.idNumber}\nDirección: ${myState.address}\nNúmeros de contacto: ${myState.contactNumbers}\nCorreo electrónico: ${myState.email}\nPlan: ${myState.plan}`);
 
     })
-    .addAnswer('¿Son estos datos correctos? (Responde con sí o no)', { capture: true }, async (ctx, { flowDynamic, state, provider, gotoFlow }) => {
+    .addAnswer('*¿Son estos datos correctos? (Responde con sí o no)*', { capture: true }, async (ctx, { flowDynamic, state, provider, gotoFlow }) => {
         const myState = state.getMyState();
         console.log('Proveedor recibido:', provider);
         if (ctx.body.toLowerCase() === 'sí' || ctx.body.toLowerCase() === 'si') {
@@ -399,10 +372,10 @@ const flowServicios = addKeyword(EVENTS.ACTION).addAnswer(
     {
       capture: true,
     },
-    async (ctx, { gotoFlow, fallback, flowDynamic }) => {
+    async (ctx, { gotoFlow, fallBack, flowDynamic }) => {
         console.log('datos usuario: ',ctx);
       if (!["1", "2", "3", "4","5","6","7","0"].includes(ctx.body)) {
-        return fallback("Respuesta no válida, por favor selecciona una de las opciones.");
+        return fallBack('*Respuesta no válida, por favor selecciona una de las opciones.*');
       }
   
       switch (ctx.body) {
@@ -481,41 +454,44 @@ const flowPrincipal = addKeyword([
         'internet prepago', 
         'internet mensual', 
         'promociones de internet'
-        ])
-        .addAnswer(
+    ])
+    .addAnswer(
         menu,
-        {
-          capture: true,
-        },
-        async (ctx, { gotoFlow, fallback, flowDynamic }) => {
-            console.log('datos usuario: ',ctx);
-          if (!["1", "2", "3", "4","0"].includes(ctx.body)) {
-            return fallback("Respuesta no válida, por favor selecciona una de las opciones.");
-          }
-      
-          switch (ctx.body) {
-            case "1":
-              return  gotoFlow(flowServicios);
-            case "2":
-              return  gotoFlow(flowFacturas);
-            case "3":
-              return  gotoFlow(flowSoporte);
-            case "4":
-              return  gotoFlow(flowOtrasConsultas);
-            case "0":
-              return  await flowDynamic("Saliendo... Puedes volver a acceder a este menú escribiendo *Menu*");
-          }
+        { capture: true },
+        async (ctx, { gotoFlow, fallBack, flowDynamic }) => {
+            console.log('datos usuario: ', ctx);
+            if (!["1", "2", "3", "4", "0"].includes(ctx.body)) {
+                return fallBack('Respuesta no válida, por favor selecciona una de las opciones.');
+            }
+    
+            switch (ctx.body) {
+                case "1":
+                    return gotoFlow(flowServicios);
+                case "2":
+                    return gotoFlow(flowFacturas);
+                case "3":
+                    return gotoFlow(flowSoporte);
+                case "4":
+                    return gotoFlow(flowOtrasConsultas);
+                case "0":
+                    return await flowDynamic("Saliendo... Puedes volver a acceder a este menú escribiendo *Menu*");
+            }
         }
-      );
+    );
 
 const main = async () => {
-    const adapterDB = new MySQLAdapter({
-        host: MYSQL_DB_HOST,
-        user: MYSQL_DB_USER,
-        database: MYSQL_DB_NAME,
-        password: MYSQL_DB_PASSWORD,
-        port: MYSQL_DB_PORT,
-    })
+
+    const adapterDB = new MongoAdapter({
+        dbUri: 'mongodb://198.50.181.104:27017',
+        dbName: 'db_bot',
+     })
+    // const adapterDB = new MySQLAdapter({
+    //     host: MYSQL_DB_HOST,
+    //     user: MYSQL_DB_USER,
+    //     database: MYSQL_DB_NAME,
+    //     password: MYSQL_DB_PASSWORD,
+    //     port: MYSQL_DB_PORT,
+    // })
     const adapterFlow = createFlow([flowPrincipal,flowServicios,flowFacturas,flowSoporte,flowOtrasConsultas,flowSectorUrbano,flowSectorRural,flowSectorRuralSanroque,flowSectorRuralCaserio,flowSectorQuituro,flowSectorSanadolfo ,flowVerificarCobertura,flowRecopilarDatos,flowVoice])
     const adapterProvider = createProvider(BaileysProvider)
     createBot({
@@ -525,6 +501,5 @@ const main = async () => {
     })
     QRPortalWeb()
 }
-
 
 main()

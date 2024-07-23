@@ -1,4 +1,4 @@
-Selecciona el sector de Pitalito para dónde solicitas la instalación del servicio... 
+*📍Selecciona el sector de Pitalito para dónde solicitas la instalación del servicio...*
  
 1. Sector urbano 
 2. Sector rural 
@@ -10,4 +10,4 @@ Selecciona el sector de Pitalito para dónde solicitas la instalación del servi
 5. Sector de Quituro – Tarqui
 6. Sector de San Adolfo  
 
-Por favor, escribe el número correspondiente para continuar con tu solicitud...
+*☝️Por favor, escribe el número correspondiente para continuar con tu solicitud...*
