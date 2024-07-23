@@ -1,13 +1,15 @@
-👋 ¡Hola! Bienvenido a Fututel Internet. Soy tu asistente virtual. ¿En qué puedo ayudarte hoy?
+👋 *¡Hola! Bienvenido a Fututel Internet. Soy tu asistente virtual. ¿En qué puedo ayudarte hoy?*
 
-1. Servicio 📡
+*1. Servicio* 📡
 ¡Descubre nuestros planes y ofertas exclusivas para ti!
 
-2. Facturación 🧾
+*2. Facturación* 🧾
 ¡Consulta el estado de tu cuenta y tus facturas fácilmente!
 
-3. Soporte Técnico ⚙
+*3. Soporte Técnico* ⚙
 ¡Obtén asistencia técnica en caso de fallas con tu servicio!
 
-4. Otras consultas...
+*4. Otras consultas...*
 ¿Algo más en lo que te pueda ayudar?
+
+*☝️Por favor, escribe el número correspondiente para continuar con tu solicitud...*

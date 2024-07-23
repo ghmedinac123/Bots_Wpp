@@ -26,3 +26,8 @@ tmp/
 # Python specific files
 __pycache__/
 *.pyc
+.env
+
+bot_sessions/
+bfg-1.13.0.jar
+.env
