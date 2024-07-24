@@ -3,13 +3,12 @@ const MongoAdapter = require('@bot-whatsapp/database/mongo');
 const QRPortalWeb = require('@bot-whatsapp/portal');
 const BaileysProvider = require('@bot-whatsapp/provider/baileys');
 const { downloadMediaMessage } = require('@adiwajshing/baileys');
-const MySQLAdapter = require('@bot-whatsapp/database/mysql');
 const axios = require('axios');
 const path = require("path");
 const fs = require("fs");
+const mysql = require('mysql');
 const { exec } = require('child_process');
 
-const{ handlerAI }=require("./whisper.js")
 
 const menuPath = path.join(__dirname, "mensajes", "menu.txt");
 const menu = fs.readFileSync(menuPath, "utf-8"); 
@@ -43,11 +42,11 @@ QRPortalWeb({ name: BOTNAME, port: 3052 })
 /**
  * Declaramos las conexiones de MySQL
  */
-// const MYSQL_DB_HOST = 'localhost'
-// const MYSQL_DB_USER = 'root'
-// const MYSQL_DB_PASSWORD = 'GBBGH4R53A8FGLS'
-// const MYSQL_DB_NAME = 'bots'
-// const MYSQL_DB_PORT = '3306'
+const MYSQL_DB_HOST = 'localhost'
+const MYSQL_DB_USER = 'root'
+const MYSQL_DB_PASSWORD = 'GBBGH4R53A8FGLS'
+const MYSQL_DB_NAME = 'bots'
+const MYSQL_DB_PORT = '3306'
 /**
  * Declaramos las conexiones MONGODB
  */
@@ -112,6 +111,7 @@ const flowVoice = addKeyword(EVENTS.VOICE_NOTE).addAnswer("Esta es una nota de v
     const wavPath = audioPath.replace('.ogg', '.wav');
     
     try {
+        console.log('Mensaje: ',ctx.body);
         console.log("Descargando el archivo de audio desde el mensaje.");
         const buffer = await downloadMediaMessage(ctx, 'buffer');
         fs.writeFileSync(audioPath, buffer);
@@ -183,10 +183,7 @@ const flowVoice = addKeyword(EVENTS.VOICE_NOTE).addAnswer("Esta es una nota de v
 });
 
 
-
-
-
-const humanAgent = '5731688833245@s.whatsapp.net';
+const humanAgent = '573168883324@s.whatsapp.net';
 
 const sendToHumanAgent = async (provider, message) => {
   
@@ -207,39 +204,63 @@ const sendToHumanAgent = async (provider, message) => {
 
 const flowRecopilarDatos = addKeyword(EVENTS.ACTION)
     .addAnswer('Si te interesa contratar el servicio, envíanos los siguientes datos: 📑\n✓ Nombre completo del titular.', {
-        capture: true
+        capture: true,
+        idle: 6 * 60 * 60 * 1000 
     }, async (ctx, { flowDynamic, state }) => {
+        if (ctx.idleFallBack) {
+            return gotoFlow(flowRecordatorio);        
+        }
         await state.update({ name: ctx.body });
         await flowDynamic('Gracias por tu nombre');
     })
-    .addAnswer('¿Cuál es tu número de cédula del titular?', { capture: true }, async (ctx, { flowDynamic, state }) => {
+    .addAnswer('¿Cuál es tu número de cédula del titular?', { capture: true, idle: 6 * 60 * 60 * 1000 }, async (ctx, { flowDynamic, state }) => {
+        if (ctx.idleFallBack) {
+            return gotoFlow(flowRecordatorio);       
+        }
         await state.update({ idNumber: ctx.body });
         await flowDynamic('Gracias por tu número de cédula.');
     })
-    .addAnswer('¿Cuál es tu dirección completa de residencia?', { capture: true }, async (ctx, { flowDynamic, state }) => {
+    .addAnswer('¿Cuál es tu dirección completa de residencia?', { capture: true, idle: 6 * 60 * 60 * 1000 }, async (ctx, { flowDynamic, state }) => {
+        if (ctx.idleFallBack) {
+            return gotoFlow(flowRecordatorio);  
+        }
         await state.update({ address: ctx.body });
-        await flowDynamic('Gracias por tu dirección. ');
+        await flowDynamic('Gracias por tu dirección.');
     })
-    .addAnswer('¿Cuáles son los dos números de celular de contacto?', { capture: true }, async (ctx, { flowDynamic, state }) => {
+    .addAnswer('¿Cuáles son los dos números de celular de contacto?', { capture: true, idle: 6 * 60 * 60 * 1000 }, async (ctx, { flowDynamic, state }) => {
+        if (ctx.idleFallBack) {
+            return gotoFlow(flowRecordatorio);
+        }
         await state.update({ contactNumbers: ctx.body });
         await flowDynamic('Gracias por los números de contacto');
     })
-    .addAnswer('Por favor, envía una fotografía del recibo de energía.', { capture: true }, async (ctx, { flowDynamic, state }) => {
+    .addAnswer('Por favor, envía una fotografía del recibo de energía.', { capture: true, idle: 6 * 60 * 60 * 1000 }, async (ctx, { flowDynamic, state }) => {
+        if (ctx.idleFallBack) {
+            return gotoFlow(flowRecordatorio);        
+        }
         await state.update({ energyBill: ctx.body });
         await flowDynamic('Gracias por la fotografía');
     })
-    .addAnswer('¿Cuál es tu correo electrónico?', { capture: true }, async (ctx, { flowDynamic, state }) => {
+    .addAnswer('¿Cuál es tu correo electrónico?', { capture: true, idle: 6 * 60 * 60 * 1000 }, async (ctx, { flowDynamic, state }) => {
+        if (ctx.idleFallBack) {
+            return gotoFlow(flowRecordatorio); 
+        }
         await state.update({ email: ctx.body });
         await flowDynamic('Gracias por tu correo.');
     })
-    .addAnswer('¿Qué plan deseas contratar?', { capture: true }, async (ctx, { flowDynamic, state }) => {
+    .addAnswer('¿Qué plan deseas contratar?', { capture: true, idle: 6 * 60 * 60 * 1000 }, async (ctx, { flowDynamic, state }) => {
+        if (ctx.idleFallBack) {
+            return gotoFlow(flowRecordatorio);       
+        }
         await state.update({ plan: ctx.body });
         const myState = state.getMyState();
         console.log('Datos recopilados:', myState);
         await flowDynamic(`Tus datos son:\nNombre: ${myState.name}\nNúmero de cédula: ${myState.idNumber}\nDirección: ${myState.address}\nNúmeros de contacto: ${myState.contactNumbers}\nCorreo electrónico: ${myState.email}\nPlan: ${myState.plan}`);
-
     })
-    .addAnswer('*¿Son estos datos correctos? (Responde con sí o no)*', { capture: true }, async (ctx, { flowDynamic, state, provider, gotoFlow }) => {
+    .addAnswer('*¿Son estos datos correctos? (Responde con sí o no)*', { capture: true, idle: 6 * 60 * 60 * 1000 }, async (ctx, { flowDynamic, state, provider, gotoFlow }) => {
+        if (ctx.idleFallBack) {
+            return gotoFlow(flowRecordatorio);
+        }
         const myState = state.getMyState();
         console.log('Proveedor recibido:', provider);
         if (ctx.body.toLowerCase() === 'sí' || ctx.body.toLowerCase() === 'si') {
@@ -255,13 +276,20 @@ const flowRecopilarDatos = addKeyword(EVENTS.ACTION)
             return gotoFlow(flowRecopilarDatos); // Redirigir al inicio del flujo de recopilación de datos
         }
     });
+;
 
 const flowVerificarCobertura = addKeyword(EVENTS.ACTION)
     .addAnswer("Por favor, envía tu ubicación ahora para verificar la cobertura.📍", {
         capture: true,
-        waitForLocation: true
+        waitForLocation: true,
+        idle: 2000 // 2 segundos para prueba
     }, async (ctx, { flowDynamic, gotoFlow, state, provider }) => {
         console.log('Datos usuario:📍📍 ', ctx);
+
+        if (ctx.idleFallBack) {
+            console.log('Inactividad detectada, enviando mensaje de recordatorio.');
+            return gotoFlow(flowRecordatorio);        }
+
         if (ctx.message && ctx.message.locationMessage) {
             const latitude = ctx.message.locationMessage.degreesLatitude;
             const longitude = ctx.message.locationMessage.degreesLongitude;
@@ -272,11 +300,9 @@ const flowVerificarCobertura = addKeyword(EVENTS.ACTION)
                 await flowDynamic(message);
 
                 if (result.hasCoverage) {
-                    // Redirigir al siguiente flujo si hay cobertura
                     await state.update({ hasCoverage: true });
                     return gotoFlow(flowRecopilarDatos);
                 } else {
-                    // Notificar al agente humano si no hay cobertura
                     const userMessage = 'Por favor espera un momento!';
                     const agentMessage = `Usuario con número ${ctx.from} y nombre ${ctx.pushName} ha recibido una predicción de no cobertura. Por favor, verifique manualmente.`;
 
@@ -288,118 +314,119 @@ const flowVerificarCobertura = addKeyword(EVENTS.ACTION)
             }
         } else {
             await flowDynamic('❌ No se recibió una ubicación válida. Por favor, intenta enviar tu ubicación nuevamente.');
-            // Mantener el estado hasta recibir una ubicación válida
             state.update({ waitingForValidLocation: true });
             return gotoFlow(flowVerificarCobertura);
         }
     });
 
-
-
-    
 const flowSectorSanadolfo = addKeyword(EVENTS.ACTION)
-
     .addAnswer(plan_rural_sanadolfo)
     .addAnswer("🗺 Para verificar la cobertura de nuestro servicio en tu área, por favor envíanos tu ubicación. 📍🌍", {
-        delay: 2000 // Aquí agregas el delay de 2 segundos
+        delay: 2000 
     })
     .addAnswer("Sigue los pasos de este video desde el lugar para donde solicita el servicio!Es muy fácil!", {
         media: "https://bots.fututel.com/video_muestra.mp4"
     }, async (_, { gotoFlow }) => {
-        // Redirigir al flujo de verificación de cobertura
         gotoFlow(flowVerificarCobertura);
     });
-
 
 const flowSectorQuituro = addKeyword(EVENTS.ACTION)
     .addAnswer(plan_rural_quituro)
     .addAnswer("🗺 Para verificar la cobertura de nuestro servicio en tu área, por favor envíanos tu ubicación. 📍🌍", {
-        delay: 2000 // Aquí agregas el delay de 2 segundos
+        delay: 2000 
     })
     .addAnswer("Sigue los pasos de este video desde el lugar para donde solicita el servicio!Es muy fácil!", {
         media: "https://bots.fututel.com/video_muestra.mp4"
     }, async (_, { gotoFlow }) => {
-        // Redirigir al flujo de verificación de cobertura
         gotoFlow(flowVerificarCobertura);
     });
 
 const flowSectorRuralCaserio = addKeyword(EVENTS.ACTION)
     .addAnswer(plan_rural_caserio)
     .addAnswer("🗺 Para verificar la cobertura de nuestro servicio en tu área, por favor envíanos tu ubicación. 📍🌍", {
-        delay: 2000 // Aquí agregas el delay de 2 segundos
+        delay: 2000 
     })
     .addAnswer("Sigue los pasos de este video desde el lugar para donde solicita el servicio!Es muy fácil!", {
         media: "https://bots.fututel.com/video_muestra.mp4"
     }, async (_, { gotoFlow }) => {
-        // Redirigir al flujo de verificación de cobertura
         gotoFlow(flowVerificarCobertura);
     });
 
 const flowSectorRuralSanroque = addKeyword(EVENTS.ACTION)
     .addAnswer(plan_rural_sanroque)
     .addAnswer("🗺 Para verificar la cobertura de nuestro servicio en tu área, por favor envíanos tu ubicación. 📍🌍", {
-        delay: 2000 // Aquí agregas el delay de 2 segundos
+        delay: 2000 
     })
     .addAnswer("Sigue los pasos de este video desde el lugar para donde solicita el servicio!Es muy fácil!", {
         media: "https://bots.fututel.com/video_muestra.mp4"
     }, async (_, { gotoFlow }) => {
-        // Redirigir al flujo de verificación de cobertura
         gotoFlow(flowVerificarCobertura);
     });
 
 const flowSectorRural = addKeyword(EVENTS.ACTION)
     .addAnswer(plan_rural)
     .addAnswer("🗺 Para verificar la cobertura de nuestro servicio en tu área, por favor envíanos tu ubicación. 📍🌍", {
-        delay: 2000 // Aquí agregas el delay de 2 segundos
+        delay: 2000 
     })
     .addAnswer("Sigue los pasos de este video desde el lugar para donde solicita el servicio!Es muy fácil!", {
         media: "https://bots.fututel.com/video_muestra.mp4"
     }, async (_, { gotoFlow }) => {
-        // Redirigir al flujo de verificación de cobertura
         gotoFlow(flowVerificarCobertura);
     });
 
 const flowSectorUrbano = addKeyword(EVENTS.ACTION)
     .addAnswer(plan_urbano)
     .addAnswer("🗺 Para verificar la cobertura de nuestro servicio en tu área, por favor envíanos tu ubicación. 📍🌍", {
-        delay: 2000 // Aquí agregas el delay de 2 segundos
+        delay: 2000 
     })
     .addAnswer("Sigue los pasos de este video desde el lugar para donde solicita el servicio!Es muy fácil!", {
         media: "https://bots.fututel.com/video_muestra.mp4"
     }, async (_, { gotoFlow }) => {
-        // Redirigir al flujo de verificación de cobertura
         gotoFlow(flowVerificarCobertura);
     });
 
 const flowServicios = addKeyword(EVENTS.ACTION).addAnswer(
-    menu_planes,
-    {
-      capture: true,
-    },
-    async (ctx, { gotoFlow, fallBack, flowDynamic }) => {
-        console.log('datos usuario: ',ctx);
-      if (!["1", "2", "3", "4","5","6","7","0"].includes(ctx.body)) {
-        return fallBack('*Respuesta no válida, por favor selecciona una de las opciones.*');
-      }
-  
-      switch (ctx.body) {
-        case "1":
-          return  gotoFlow(flowSectorUrbano);
-        case "2":
-          return  gotoFlow(flowSectorRural);
-        case "3":
-          return  gotoFlow(flowSectorRuralSanroque);
-        case "4":
-          return  gotoFlow(flowSectorRuralCaserio);
-        case "5":
-            return  gotoFlow(flowSectorQuituro);
-        case "6":
-            return  gotoFlow(flowSectorSanadolfo);
-        case "0":
-          return  await flowDynamic("Saliendo... Puedes volver a acceder a este menú escribiendo *Menu*");
-      }
-    }
-  );
+        menu_planes,
+        {
+            capture: true,
+            idle: 6*60*60*1000, //  6 horas en producción
+        },
+        async (ctx, { gotoFlow, fallBack, flowDynamic, state }) => {
+            console.log('datos usuario: ', ctx);
+    
+            if (ctx.idleFallBack) {
+                console.log('Inactividad detectada, enviando mensaje de recordatorio.');
+                // Enviar el mensaje de recordatorio al usuario
+                return gotoFlow(flowRecordatorio);
+            }
+            const userMessage = ctx.body || ctx.message?.extendedTextMessage?.text;
+
+            if (!["1", "2", "3", "4", "5", "6", "7", "0"].includes(userMessage)) {
+                return fallBack('*Respuesta no válida, por favor selecciona una de las opciones.*');
+            }    
+            switch (userMessage) {
+                case "1":
+                    return gotoFlow(flowSectorUrbano);
+                case "2":
+                    return gotoFlow(flowSectorRural);
+                case "3":
+                    return gotoFlow(flowSectorRuralSanroque);
+                case "4":
+                    return gotoFlow(flowSectorRuralCaserio);
+                case "5":
+                    return gotoFlow(flowSectorQuituro);
+                case "6":
+                    return gotoFlow(flowSectorSanadolfo);
+                case "0":
+                    return await flowDynamic([{ body: "Saliendo... Puedes volver a acceder a este menú escribiendo *Menu*" }]);
+            }
+        }
+    );
+
+   
+const  flowRecordatorio= addKeyword(EVENTS.ACTION)
+    .addAnswer("No hemos recibido una respuesta en 6 horas. Si necesitas más ayuda, no dudes en preguntar. ¡Estamos aquí para ayudarte!");
+
 
 const flowFacturas = addKeyword(EVENTS.ACTION)
   .addAnswer(
@@ -417,48 +444,44 @@ const flowSoporte = addKeyword(EVENTS.ACTION)
         'Nota: Dale click sobre el número y presiona "Chatear con" para ir directamente a la conversación con el agente de soporte que te atenderá.'
     );
 
+// Flujo para manejar consultas adicionales
 const flowOtrasConsultas = addKeyword(EVENTS.ACTION)
     .addAnswer('Por favor, proporciona más detalles sobre tu consulta.')
-    .addAction({ capture: true }, async (ctx, { flowDynamic }) => {
-        const userMessage = ctx.body;
-        console.log("mensaje a enviar al chatbot: ",userMessage);
-        const reply = await queryExternalChatbot(userMessage);
-        await flowDynamic(reply);
+    .addAction({ capture: true }, async (ctx, { flowDynamic, gotoFlow }) => {
+        if (ctx.message?.audioMessage) {
+            // Redirigir al flujo de manejo de audio si se recibe una nota de voz
+            return gotoFlow(flowVoice);
+        } else {
+            // Manejar el texto enviado
+            const userMessage = ctx.body;
+            console.log("mensaje a enviar al chatbot: ", userMessage);
+            const reply = await queryExternalChatbot(userMessage);
+            await flowDynamic([{ body: reply }]);
+        }
     });
 
-const flowPrincipal = addKeyword([
-        'hola', 
-        'ole', 
-        'alo', 
-        'buenos dias', 
-        'buenas tardes', 
-        'buenas noches', 
-        'menu', 
-        'quiero internet', 
-        'solicitar internet', 
-        'contratar internet', 
-        'servicio de internet', 
-        'planes de internet', 
-        'internet hogar', 
-        'internet para mi casa', 
-        'cobertura de internet', 
-        'instalación de internet', 
-        'internet barato', 
-        'mejor internet', 
-        'precio de internet', 
-        'cotización internet', 
-        'internet empresarial', 
-        'internet oficina', 
-        'wifi', 
-        'internet fibra óptica', 
-        'internet alta velocidad', 
-        'paquetes de internet', 
-        'velocidad de internet', 
-        'internet ilimitado', 
-        'internet prepago', 
-        'internet mensual', 
-        'promociones de internet'
-    ])
+
+const flowGracias = addKeyword(['adios', 'gracias', 'bye', 'nos vemos', 'hasta luego', 'hasta pronto', 'cuídate'])
+    .addAnswer('¡Gracias por estar con nosotros! 😊 Tu visita es siempre un placer. ¡Hasta pronto y que tengas un día maravilloso! 🎉')
+
+
+
+
+const flowOnOff = addKeyword(['onoff','asesor'])
+    .addAction(async (_, { flowDynamic, globalState }) => {
+        const currentGlobalState = globalState.getMyState();
+        if (currentGlobalState.encendido) {
+            await globalState.update({ encendido: false });
+            await flowDynamic([{ body: '🤖 Bot desactivado. Para volver a activarlo, escribe "onoff".' }]);
+        } else {
+            await globalState.update({ encendido: true });
+            await flowDynamic([{ body: '🤖 Bot activado. ¡Listo para asistirte!' }]);
+        }
+    })
+    .addAnswer('Gracias por tu participación. 😊');
+   
+
+const flowPrincipal = addKeyword(EVENTS.WELCOME)
     .addAnswer(
         menu,
         { capture: true },
@@ -484,26 +507,58 @@ const flowPrincipal = addKeyword([
     );
 
 const main = async () => {
-
+        // Conexión a la base de datos MySQL
+    const mysqlConnection = mysql.createConnection({
+        host: MYSQL_DB_HOST,
+        user: MYSQL_DB_USER,
+        password: MYSQL_DB_PASSWORD,
+        database: MYSQL_DB_NAME,
+        port: MYSQL_DB_PORT,
+     });
+    
+    mysqlConnection.connect();
+    
+        // Consulta a la base de datos MySQL para obtener los números de teléfono
+    mysqlConnection.query('SELECT movil FROM login', async (error, results) => {
+        if (error) throw error;
+    
+        // Log de los resultados de la consulta
+        console.log("Resultados de la consulta SQL:", results);
+    
+        // Formateo de números, añadiendo el prefijo '57' si no está presente
+        const blackList = results.map(row => {
+            let movil = row.movil.replace(/\D/g, ''); // Elimina cualquier carácter no numérico
+            if (!movil.startsWith('57')) {
+            movil = '57' + movil;
+        }
+        return movil;
+    });
+    
+        // Log de los números formateados para la lista negra
+    console.log("Lista negra (blacklist) de números:", blackList);
+    
+        // Cierra la conexión a MySQL
+    mysqlConnection.end();
+    
+            // Configuración del bot usando MongoAdapter
     const adapterDB = new MongoAdapter({
         dbUri: 'mongodb://198.50.181.104:27017',
         dbName: 'db_bot',
-     })
-    // const adapterDB = new MySQLAdapter({
-    //     host: MYSQL_DB_HOST,
-    //     user: MYSQL_DB_USER,
-    //     database: MYSQL_DB_NAME,
-    //     password: MYSQL_DB_PASSWORD,
-    //     port: MYSQL_DB_PORT,
-    // })
-    const adapterFlow = createFlow([flowPrincipal,flowServicios,flowFacturas,flowSoporte,flowOtrasConsultas,flowSectorUrbano,flowSectorRural,flowSectorRuralSanroque,flowSectorRuralCaserio,flowSectorQuituro,flowSectorSanadolfo ,flowVerificarCobertura,flowRecopilarDatos,flowVoice])
-    const adapterProvider = createProvider(BaileysProvider)
-    createBot({
+    });
+    
+    const adapterFlow = createFlow([flowPrincipal, flowServicios, flowFacturas, flowSoporte, flowOtrasConsultas, flowSectorUrbano, flowSectorRural, flowSectorRuralSanroque, flowSectorRuralCaserio, flowSectorQuituro, flowSectorSanadolfo, flowVerificarCobertura, flowRecopilarDatos, flowVoice,flowGracias,flowOnOff,flowRecordatorio]);
+    const adapterProvider = createProvider(BaileysProvider);
+    
+        createBot({
         flow: adapterFlow,
         provider: adapterProvider,
         database: adapterDB,
-    })
-    QRPortalWeb()
-}
-
-main()
+    }, {
+                blackList: blackList, // Asignación de la lista negra
+     });
+    
+    QRPortalWeb();
+    });
+};
+    
+main().catch(console.error);
